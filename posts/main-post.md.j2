@@ -14,6 +14,12 @@ If you've never used KeePass or KeeAgent, [start here](https://blog.wizardsofthe
 
 ## Problem
 
+Simply put, managing a ton of keys is a serious pain. If, like me, you've never really delved into the myriad ways to beef up your settings, you'll hit a few snags:
+
+* You have to manually add a ton of keys to `ssh-agent`, which means typing passphrases for days when your power goes out, killing the longest continuous uptime you've had in months
+* You have to juggle keys in the agent, as most servers have a fairly low retry count (default is, I believe, six)
+* You have to manually enter the passphrases for anything specified in your config that's not active in your agent, which seems like a waste of time if you're just going to have to juggle anyway
+
 ## Solution
 
 ## Example
