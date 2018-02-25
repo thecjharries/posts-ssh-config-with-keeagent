@@ -1,0 +1,218 @@
+{% from 'shell_session.j2' import shell_session %}
+
+I'll be the first to admit my security has room for improvement. Until last year, I was reusing passwords intermixed with a terribly simple mnemonic. Until a few months ago, my phone and computer were totally unencrypted. I've been fighting the change because it's scary. I'm also very lazy and have been dreading the extra work involved with good security. I've put off updating SSH credentials for about two years now for that exact reason.
+
+I decided to at least pretend like I was doing something about that this morning. It's a gargantuan task: managing many keys with many passphrases on many machines with so much typing involved. Rather than actually sitting down to update things, I poked around man pages and Stack Overflow for a bit, avoiding more than anything else. Somehow I managed to put together a halfway decent solution that, so far, seems to remove almost all the heavy lifting.
+
+<p class="nav-p"><a id="post-nav"></a></p>
+
+<!-- wotw_toc -->
+
+## Requirements
+
+* [KeePass 2.X](https://keepass.info/download.html)
+* [KeeAgent](https://keepass.info/plugins.html#keeagent)
+* [`ssh_config`](https://linux.die.net/man/5/ssh_config)
+
+If you've never used KeePass or KeeAgent, [start here](https://blog.wizardsoftheweb.pro/keepass-ssh/). I've written about the two together before.
+
+On the other hand, it should be possible to set up most of this with the vanilla `ssh-agent` or something more opinionated like `gnome-keyring-daemon` or `kdewallet5`. Taking KeePass and KeeAgent out of the equation, in my opinion, generates way more work, but YMMV.
+
+## Note
+
+KeePass hasn't been thrilled with `i3` and my theme choices. I apologize for the strange layouts. Unless you decide to go and change everything it doesn't normally look this bad. I was too excited about the solution to go and undo all my tweaks.
+
+## Problem
+
+Simply put, managing a ton of keys is a serious pain. If, like me, you've never really delved into the myriad ways to beef up your settings, you'll hit a few snags:
+
+* You have to manually add a ton of keys to `ssh-agent`, which means typing passphrases for days when your power goes out, killing the longest continuous uptime you've had in months
+* You have to juggle keys in the agent, as most servers have a fairly low retry count (default is, I believe, six)
+* You have to manually enter the passphrases for anything specified in your config that's not active in your agent, which seems like a waste of time if you're just going to have to juggle anyway
+
+## Solution
+
+Those statements, built on experience and [prevailing wisdom](https://serverfault.com/a/820048/446829), touch on some pretty major annoyances. However, they all suffer from a perspective problem. They begin with the assumption that a user has many keys and connects to many machines. That's very true. But it ignores a very important detail: while there are many possible permutations of key and machine, the number of successful permutations is much smaller and (in theory) proper matchings are already known.
+
+`ssh_config` defines a vehicle to specify proper matchings. Providing an `IdentityFile` (or several) per host establishes a match. `IdentitiesOnly` prevents `ssh` from trying anything not specified in the config or CLI, effectively sidestepping the retry issue. `IdentityAgent` provides an agent failsafe (or multiple agents in tandem). KeePass and KeeAgent glue everything together with remembered credentials, making the config much more powerful.
+
+Assuming `~/.ssh/some_key` is in KeePass and available to KeeAgent, this simple config is enough to get you started:
+
+{{
+    highlight_block(
+        """\
+Host simple_name
+    HostName fqdn
+    User remote_user
+    IdentitiesOnly yes
+    IdentityFile ~/.ssh/some_key
+    IdentityAgent SSH_AUTH_SOCK
+""",
+        explicit_lexer_name = 'TextLexer',
+        title = '~/.ssh/config',
+    )
+}}
+
+## Example
+
+All of this will make much more sense after a good example. I'm going to build everything from scratch and try to illustrate the pain points I believe I've mitigated.
+
+### Generate Keys
+
+To demonstrate something closer to an ideal environment, I've generated ten keys. They're all ridiculously weak and shouldn't be used in production (passphrase was passed via the CLI, which should be enough warning).
+
+{{
+    shell_session("""
+$ ssh-keygen \\
+    -t rsa \\
+    -P password03 \\
+    -C user03@host \\
+    -f dummy_key_03
+Generating public/private rsa key pair.
+Your identification has been saved in dummy_key_03.
+Your public key has been saved in dummy_key_03.pub.
+The key fingerprint is:
+SHA256:SxGPZn/19LYMIEA05z+4sezZ9ruBG1cQdaaBf0sr5Tc user03@host
+The key's randomart image is:
++---[RSA 2048]----+
+|      o=..   oo.o|
+|        =+  . .+.|
+|        =o.. oo .|
+|       o o+ ..o=o|
+|        So.o..+o*|
+|       ...+.o.+Eo|
+|        .+ o o.oo|
+|        . o.+ .  |
+|         o.o.+o  |
++----[SHA256]-----+
+""")
+}}
+
+### Populate KeePass
+
+With the keys in hand, I populated the KeePass database next. Each entry's password is the passphrase to the key, and the keys themselves are attached to the entries.
+
+![loaded-db](/content/images/2018/02/loaded-db.png)
+
+The easiest way to make things work is to allow KeeAgent to use each entry. If you don't, you'll have to manually add the key later (which has its uses).
+
+![keeagent-enabled](/content/images/2018/02/keeagent-enabled.png)
+
+All told, this is about seven more active keys than I'm used to having around. It's a strange feeling, to say the least.
+
+![all-in-keeagent](/content/images/2018/02/all-in-keeagent.png)
+
+### Create Environment
+
+To make things as simple as possible, I created a `vagrant` box that will act as the remote. I did a few things:
+
+* Created `dummy_user`
+* Assigned `dummy_key_10` (the last in the list) as `dummy_user`'s primary key (also `authorized_key`)
+* Removed password access (forcing a key exchange)
+* Lowered the number of attempts to three
+
+`vagrant` exposes its own `ssh_config` via `ssh-config`, which we'll use to to access the box and later as a template for our own.
+
+{{
+    shell_session("""
+$ vagrant ssh-config
+Host default
+  HostName 192.168.121.150
+  User vagrant
+  Port 22
+  UserKnownHostsFile /dev/null
+  StrictHostKeyChecking no
+  PasswordAuthentication no
+  IdentityFile ...
+  IdentitiesOnly yes
+  LogLevel FATAL
+""")
+}}
+
+### Easy Failure
+
+We're going to try to connect with all the keys active.
+
+{{
+    shell_session("""
+$ ssh-add -l
+2048 SHA256:7Fd0YO1OENizISLV+rzBHc+KHpsDKnfkZoPEOKNoGt4 user01@host (RSA)
+2048 SHA256:/alv7iswhB0YMgYtUYbVu4UTHCLpqa7M/o7PXBf5NJk user02@host (RSA)
+2048 SHA256:7FBCSXS7hWUWV7PxRvw65PytkoF65gh/b4vJU49jBNU user03@host (RSA)
+2048 SHA256:CL4UsKgCscVv3WyFY0RgiZfRrfOPI+etatN779C7fX0 user04@host (RSA)
+2048 SHA256:IWSIHh8A3ApK0s0SaxIxeyRpSTmoMjMFW827iPvc3OE user05@host (RSA)
+2048 SHA256:E3ovjpFD524ZoYmzUO/ucBDAfGAyeP7jzwlaLqi0Mi0 user06@host (RSA)
+2048 SHA256:Qh/Nss0znxMwpTGlOqpxacsrj8in3xYv4A8bcRhH/Ik user07@host (RSA)
+2048 SHA256:md1KsOzJ/BsYtZBgFA5PxhR4eyEfUwFPdoTurhHDEao user08@host (RSA)
+2048 SHA256:SEu3eaPbHPRgyp/7lpkbT1Wpcv2oZ45vOWshTgXiZp0 user09@host (RSA)
+2048 SHA256:3nzgRuofhgfPHgfQQERk0b1TmRLufV0ppWwixojFjlk user10@host (RSA)
+$ ssh dummy_user@192.168.121.150
+Received disconnect from 192.168.121.150 port 22:2: Too many authentication failures
+Disconnected from 192.168.121.150 port 22
+""")
+}}
+
+Quick and unsurprising.
+
+### Easier Success
+
+We can just as quickly get in with a simple config file.
+
+{{
+    highlight_block(
+        """\
+Host vagrant-box
+    HostName 192.168.121.150
+    User dummy_user
+    IdentitiesOnly yes
+    IdentityFile /path/to/dummy_key_10
+    IdentityAgent SSH_AUTH_SOCK
+""",
+        explicit_lexer_name = 'TextLexer',
+        title = '~/.ssh/config',
+    )
+}}
+
+The key path is fairly important. `ssh` attempts to load the key, sees KeeAgent already has it available, and moves on. Without a local copy of the key, there's nothing for `ssh` to go off of. (I think; this is an educated guess using the debug logs. Might not be 100% accurate.)
+
+{{
+    shell_session("""
+$ ssh vagrant-box
+Last login: Sun Feb 25 17:09:45 2018
+[dummy_user@localhost ~]$ exit
+logout
+Connection to 192.168.121.150 closed.
+""")
+}}
+
+## Recap
+
+By themselves, `ssh_config` and KeePass/KeeAgent are very powerful tools. Together they mitigate the need to juggle keys and constantly enter passphrases. `IdentityFile`, `IdentitiesOnly`, and a little bit of setup will make using more than one key a painless endeavor. Until you have to update them all...
+
+## Full Scripts
+
+These are in [the repo](https://github.com/thecjharries/posts-ssh-config-with-keeagent) but I also wanted to lay out everything here.
+
+### `keygen`
+
+{{
+    highlight_block(
+        'scripts/keygen',
+        blob_path = 'scripts/keygen',
+        explicit_lexer_name = 'PythonLexer',
+        title = 'keygen',
+        external_source_link = 'https://github.com/thecjharries/posts-ssh-config-with-keeagent/tree/master/scripts/keygen'
+    )
+}}
+
+### `Vagrantfile`
+
+{{
+    highlight_block(
+        'Vagrantfile',
+        blob_path = 'Vagrantfile',
+        explicit_lexer_name = 'RubyLexer',
+        title = 'Vagrantfile',
+        external_source_link = 'https://github.com/thecjharries/posts-ssh-config-with-keeagent/tree/master/Vagrantfile'
+    )
+}}
