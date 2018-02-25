@@ -51,6 +51,35 @@ All of this will make much more sense after a good example. I'm going to build e
 
 ### Generate Keys
 
+To demonstrate something closer to an ideal environment, I've generated ten keys. They're all ridiculously weak and shouldn't be used in production (passphrase was passed via the CLI, which should be enough warning).
+
+{{
+    shell_session("""
+$ ssh-keygen \\
+    -t rsa \\
+    -P password03 \\
+    -C user03@host \\
+    -f dummy_key_03
+Generating public/private rsa key pair.
+Your identification has been saved in dummy_key_03.
+Your public key has been saved in dummy_key_03.pub.
+The key fingerprint is:
+SHA256:SxGPZn/19LYMIEA05z+4sezZ9ruBG1cQdaaBf0sr5Tc user03@host
+The key's randomart image is:
++---[RSA 2048]----+
+|      o=..   oo.o|
+|        =+  . .+.|
+|        =o.. oo .|
+|       o o+ ..o=o|
+|        So.o..+o*|
+|       ...+.o.+Eo|
+|        .+ o o.oo|
+|        . o.+ .  |
+|         o.o.+o  |
++----[SHA256]-----+
+""")
+}}
+
 ### Populate KeePass
 
 ### Create Environment
