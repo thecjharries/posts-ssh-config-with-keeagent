@@ -1,0 +1,79 @@
+#!/usr/bin/env python
+# coding: utf8
+
+"""This file provides a script to generate dummy ssh keys"""
+
+# pylint: disable=misplaced-comparison-constant
+
+from os import makedirs
+from os.path import abspath, dirname, join
+from shutil import rmtree
+from subprocess import check_call
+
+KEY_COUNT = 10
+SCRIPTS_DIR = abspath(dirname(__file__))
+KEY_DIR = abspath(join(SCRIPTS_DIR, '..', 'keys'))
+KEEPASS_DIR = abspath(join(SCRIPTS_DIR, '..', 'keepass'))
+DATABASE_PATH = join(KEEPASS_DIR, 'NewDatabase.kdbx')
+
+
+def rebuild_key_dir():
+    """Erase and remake key dir"""
+    rmtree(KEY_DIR, True)
+    makedirs(KEY_DIR)
+
+
+def wipe_database():
+    """Wipes all KeePass entries"""
+    check_call(
+        [
+            'kpscript',
+            '-c:DeleteAllEntries',
+            DATABASE_PATH,
+            '-pw:',
+        ]
+    )
+
+
+def create_single_key(index):
+    """Creates a key for a given index"""
+    check_call(
+        [
+            'ssh-keygen',
+            '-t', 'rsa',
+            '-P', "password%02d" % index,
+            '-C', "user%02d@host" % index,
+            '-f', join(KEY_DIR, "dummy_key_%02d" % index)
+        ]
+    )
+
+
+def update_database(index):
+    """Adds the entry to the database"""
+    check_call(
+        [
+            'kpscript',
+            '-c:AddEntry',
+            DATABASE_PATH,
+            '-pw:',
+            "-UserName:dummy_key_%02d" % index,
+            "-Password:password%02d" % index
+        ]
+    )
+
+
+def create_keys():
+    """Creates all the necessary keys"""
+    for index in range(KEY_COUNT):
+        create_single_key(index + 1)
+        update_database(index + 1)
+
+
+def cli():
+    """Runs everything"""
+    rebuild_key_dir()
+    wipe_database()
+    create_keys()
+
+if '__main__' == __name__:
+    cli()
