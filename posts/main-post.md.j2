@@ -4,6 +4,10 @@ I'll be the first to admit my security has room for improvement. Until last year
 
 I decided to at least pretend like I was doing something about that this morning. It's a gargantuan task: managing many keys with many passphrases on many machines with so much typing involved. Rather than actually sitting down to update things, I poked around man pages and Stack Overflow for a bit, avoiding more than anything else. Somehow I managed to put together a halfway decent solution that, so far, seems to remove almost all the heavy lifting.
 
+<p class="nav-p"><a id="post-nav"></a></p>
+
+<!-- wotw_toc -->
+
 ## Requirements
 
 * [KeePass 2.X](https://keepass.info/download.html)
@@ -12,7 +16,11 @@ I decided to at least pretend like I was doing something about that this morning
 
 If you've never used KeePass or KeeAgent, [start here](https://blog.wizardsoftheweb.pro/keepass-ssh/). I've written about the two together before.
 
-On the other hand, it should be possible to set up most of this with vanilla `ssh-agent` or something more opinionated like `gnome-keyring-daemon` or `kdewallet5`. Taking KeePass and KeeAgent out of the equation, in my opinion, generates way more work, but YMMV.
+On the other hand, it should be possible to set up most of this with the vanilla `ssh-agent` or something more opinionated like `gnome-keyring-daemon` or `kdewallet5`. Taking KeePass and KeeAgent out of the equation, in my opinion, generates way more work, but YMMV.
+
+## Note
+
+KeePass hasn't been thrilled with `i3` and my theme choices. I apologize for the strange layouts. Unless you decide to go and change everything it doesn't normally look this bad. I was too excited about the solution to go and undo all my tweaks.
 
 ## Problem
 
@@ -24,7 +32,7 @@ Simply put, managing a ton of keys is a serious pain. If, like me, you've never 
 
 ## Solution
 
-Those statements, built on experience and [prevailing wisdom](https://serverfault.com/a/820048/446829), touch on some pretty major annoyances. However, they all suffer from a perspective problem. They begin with the assumption that a user has many keys and connects to many machines. That's very true. However, they ignore a very important detail: while there are many possible permutations of key and machine, the number of successful permutations is much smaller and (in theory) proper matchings are already known.
+Those statements, built on experience and [prevailing wisdom](https://serverfault.com/a/820048/446829), touch on some pretty major annoyances. However, they all suffer from a perspective problem. They begin with the assumption that a user has many keys and connects to many machines. That's very true. But it ignores a very important detail: while there are many possible permutations of key and machine, the number of successful permutations is much smaller and (in theory) proper matchings are already known.
 
 `ssh_config` defines a vehicle to specify proper matchings. Providing an `IdentityFile` (or several) per host establishes a match. `IdentitiesOnly` prevents `ssh` from trying anything not specified in the config or CLI, effectively sidestepping the retry issue. `IdentityAgent` provides an agent failsafe (or multiple agents in tandem). KeePass and KeeAgent glue everything together with remembered credentials, making the config much more powerful.
 
@@ -90,7 +98,7 @@ The easiest way to make things work is to allow KeeAgent to use each entry. If y
 
 ![keeagent-enabled](/content/images/2018/02/keeagent-enabled.png)
 
-All told, this is about seven more active keys that I'm used to having around. It's a strange feeling, to say the least.
+All told, this is about seven more active keys than I'm used to having around. It's a strange feeling, to say the least.
 
 ![all-in-keeagent](/content/images/2018/02/all-in-keeagent.png)
 
@@ -99,7 +107,7 @@ All told, this is about seven more active keys that I'm used to having around. I
 To make things as simple as possible, I created a `vagrant` box that will act as the remote. I did a few things:
 
 * Created `dummy_user`
-* Assigned `dummy_key_10` (the last in the list) as `dummy_user`'s primary key
+* Assigned `dummy_key_10` (the last in the list) as `dummy_user`'s primary key (also `authorized_key`)
 * Removed password access (forcing a key exchange)
 * Lowered the number of attempts to three
 
@@ -179,20 +187,21 @@ Connection to 192.168.121.150 closed.
 
 ## Recap
 
-By themselves, `ssh_config` and KeeAgent are very powerful tools. Together they mitigate the need to juggle keys and constantly enter passphrases. `IdentityFile`, `IdentitiesOnly`, and a little bit of setup will make using more than one key a painless endeavor. Until you have to update them all...
+By themselves, `ssh_config` and KeePass/KeeAgent are very powerful tools. Together they mitigate the need to juggle keys and constantly enter passphrases. `IdentityFile`, `IdentitiesOnly`, and a little bit of setup will make using more than one key a painless endeavor. Until you have to update them all...
 
 ## Full Scripts
 
-These are in the repo TODO but I also wanted to lay out everything here.
+These are in [the repo](https://github.com/thecjharries/posts-ssh-config-with-keeagent) but I also wanted to lay out everything here.
 
 ### `keygen`
 
 {{
     highlight_block(
-        '../scripts/keygen',
-        blob_path = '../scripts/keygen',
+        'scripts/keygen',
+        blob_path = 'scripts/keygen',
         explicit_lexer_name = 'PythonLexer',
         title = 'keygen',
+        external_source_link = 'https://github.com/thecjharries/posts-ssh-config-with-keeagent/tree/master/scripts/keygen'
     )
 }}
 
@@ -200,9 +209,10 @@ These are in the repo TODO but I also wanted to lay out everything here.
 
 {{
     highlight_block(
-        '../Vagrantfile',
-        blob_path = '../Vagrantfile',
+        'Vagrantfile',
+        blob_path = 'Vagrantfile',
         explicit_lexer_name = 'RubyLexer',
         title = 'Vagrantfile',
+        external_source_link = 'https://github.com/thecjharries/posts-ssh-config-with-keeagent/tree/master/Vagrantfile'
     )
 }}
