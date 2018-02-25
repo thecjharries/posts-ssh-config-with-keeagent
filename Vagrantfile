@@ -13,6 +13,8 @@ Vagrant.configure("2") do |config|
     chmod 'u=rwx,go=' /home/dummy_user/.ssh
     cp /vagrant/keys/dummy_key_10* /home/dummy_user/.ssh/
     chown -R dummy_user:dummy_user /home/dummy_user
+    cp /vagrant/keys/dummy_key_10.pub /home/dummy_user/.ssh/authorized_keys
+    chmod 'u=rw,go=' /home/dummy_user/.ssh/authorized_keys
     sed -i \
         -e 's/PermitRootLogin/#PermitRootLogin/g' \
         -e 's/#MaxAuthTries 6/MaxAuthTries 3/g' \
