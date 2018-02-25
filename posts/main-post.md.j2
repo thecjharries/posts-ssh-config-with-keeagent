@@ -96,12 +96,113 @@ All told, this is about seven more active keys that I'm used to having around. I
 
 ### Create Environment
 
+To make things as simple as possible, I created a `vagrant` box that will act as the remote. I did a few things:
+
+* Created `dummy_user`
+* Assigned `dummy_key_10` (the last in the list) as `dummy_user`'s primary key
+* Removed password access (forcing a key exchange)
+* Lowered the number of attempts to three
+
+`vagrant` exposes its own `ssh_config` via `ssh-config`, which we'll use to to access the box and later as a template for our own.
+
+{{
+    shell_session("""
+$ vagrant ssh-config
+Host default
+  HostName 192.168.121.150
+  User vagrant
+  Port 22
+  UserKnownHostsFile /dev/null
+  StrictHostKeyChecking no
+  PasswordAuthentication no
+  IdentityFile ...
+  IdentitiesOnly yes
+  LogLevel FATAL
+""")
+}}
+
 ### Easy Failure
+
+We're going to try to connect with all the keys active.
+
+{{
+    shell_session("""
+$ ssh-add -l
+2048 SHA256:7Fd0YO1OENizISLV+rzBHc+KHpsDKnfkZoPEOKNoGt4 user01@host (RSA)
+2048 SHA256:/alv7iswhB0YMgYtUYbVu4UTHCLpqa7M/o7PXBf5NJk user02@host (RSA)
+2048 SHA256:7FBCSXS7hWUWV7PxRvw65PytkoF65gh/b4vJU49jBNU user03@host (RSA)
+2048 SHA256:CL4UsKgCscVv3WyFY0RgiZfRrfOPI+etatN779C7fX0 user04@host (RSA)
+2048 SHA256:IWSIHh8A3ApK0s0SaxIxeyRpSTmoMjMFW827iPvc3OE user05@host (RSA)
+2048 SHA256:E3ovjpFD524ZoYmzUO/ucBDAfGAyeP7jzwlaLqi0Mi0 user06@host (RSA)
+2048 SHA256:Qh/Nss0znxMwpTGlOqpxacsrj8in3xYv4A8bcRhH/Ik user07@host (RSA)
+2048 SHA256:md1KsOzJ/BsYtZBgFA5PxhR4eyEfUwFPdoTurhHDEao user08@host (RSA)
+2048 SHA256:SEu3eaPbHPRgyp/7lpkbT1Wpcv2oZ45vOWshTgXiZp0 user09@host (RSA)
+2048 SHA256:3nzgRuofhgfPHgfQQERk0b1TmRLufV0ppWwixojFjlk user10@host (RSA)
+$ ssh dummy_user@192.168.121.150
+Received disconnect from 192.168.121.150 port 22:2: Too many authentication failures
+Disconnected from 192.168.121.150 port 22
+""")
+}}
+
+Quick and unsurprising.
 
 ### Easier Success
 
+We can just as quickly get in with a simple config file.
+
+{{
+    highlight_block(
+        """\
+Host vagrant-box
+    HostName 192.168.121.150
+    User dummy_user
+    IdentitiesOnly yes
+    IdentityFile /path/to/dummy_key_10
+    IdentityAgent SSH_AUTH_SOCK
+""",
+        explicit_lexer_name = 'TextLexer',
+        title = '~/.ssh/config',
+    )
+}}
+
+The key path is fairly important. `ssh` attempts to load the key, sees KeeAgent already has it available, and moves on. Without a local copy of the key, there's nothing for `ssh` to go off of. (I think; this is an educated guess using the debug logs. Might not be 100% accurate.)
+
+{{
+    shell_session("""
+$ ssh vagrant-box
+Last login: Sun Feb 25 17:09:45 2018
+[dummy_user@localhost ~]$ exit
+logout
+Connection to 192.168.121.150 closed.
+""")
+}}
+
+## Recap
+
+By themselves, `ssh_config` and KeeAgent are very powerful tools. Together they mitigate the need to juggle keys and constantly enter passphrases. `IdentityFile`, `IdentitiesOnly`, and a little bit of setup will make using more than one key a painless endeavor. Until you have to update them all...
+
 ## Full Scripts
+
+These are in the repo TODO but I also wanted to lay out everything here.
 
 ### `keygen`
 
+{{
+    highlight_block(
+        '../scripts/keygen',
+        blob_path = '../scripts/keygen',
+        explicit_lexer_name = 'PythonLexer',
+        title = 'keygen',
+    )
+}}
+
 ### `Vagrantfile`
+
+{{
+    highlight_block(
+        '../Vagrantfile',
+        blob_path = '../Vagrantfile',
+        explicit_lexer_name = 'RubyLexer',
+        title = 'Vagrantfile',
+    )
+}}
