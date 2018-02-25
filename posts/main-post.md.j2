@@ -24,6 +24,27 @@ Simply put, managing a ton of keys is a serious pain. If, like me, you've never 
 
 ## Solution
 
+Those statements, built on experience and [prevailing wisdom](https://serverfault.com/a/820048/446829), touch on some pretty major annoyances. However, they all suffer from a perspective problem. They begin with the assumption that a user has many keys and connects to many machines. That's very true. However, they ignore a very important detail: while there are many possible permutations of key and machine, the number of successful permutations is much smaller and (in theory) proper matchings are already known.
+
+`ssh_config` defines a vehicle to specify proper matchings. Providing an `IdentityFile` (or several) per host establishes a match. `IdentitiesOnly` prevents `ssh` from trying anything not specified in the config or CLI, effectively sidestepping the retry issue. `IdentityAgent` provides an agent failsafe (or multiple agents in tandem). KeePass and KeeAgent glue everything together with remembered credentials, making the config much more powerful.
+
+Assuming `~/.ssh/some_key` is in KeePass and available to KeeAgent, this simple config is enough to get you started:
+
+{{
+    highlight_block(
+        """\
+Host simple_name
+    HostName fqdn
+    User remote_user
+    IdentitiesOnly yes
+    IdentityFile ~/.ssh/some_key
+    IdentityAgent SSH_AUTH_SOCK
+""",
+        explicit_lexer_name = 'TextLexer',
+        title = '~/.ssh/config',
+    )
+}}
+
 ## Example
 
 ### Generate Keys
